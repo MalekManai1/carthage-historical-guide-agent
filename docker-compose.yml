@@ -1,0 +1,33 @@
+# PostgreSQL + pgvector for the Historical Guide RAG Agent MVP.
+# Start:  docker compose up -d
+# Stop:   docker compose down
+# Logs:   docker compose logs -f db
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: historical_guide_db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: historical_guide
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    ports:
+      # Host 5433 avoids conflict with a local PostgreSQL service on 5432 (Windows).
+      - "5433:5432"
+
+    volumes:
+      # Named volume keeps data across container restarts
+      - historical_guide_pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d historical_guide"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  historical_guide_pgdata:

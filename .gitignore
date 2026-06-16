@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Portable Node.js (run .tools/install-node.ps1 to recreate)
+.tools/node/
+
+# Frontend
+frontend/simple-chat-ui/node_modules/
+frontend/simple-chat-ui/dist/
+
+# Data (processed outputs)
+data/processed/*
+!data/processed/.gitkeep
