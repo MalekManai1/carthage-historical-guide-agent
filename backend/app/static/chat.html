@@ -3,12 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Guide Historique — Carthage</title>
+    <title>Dourbia — Guide culturel Carthage</title>
     <style>
       :root {
         font-family: "Segoe UI", system-ui, sans-serif;
-        color: #1a1a2e;
-        background: #f4f6fb;
+        color: #242424;
+        background: #f6fbfc;
+        --dourbia-orange: #fa7921;
+        --dourbia-cyan: #5ce1e6;
+        --dourbia-cyan-deep: #3ec9d0;
+        --dourbia-navy: #1a1a2e;
+        --dourbia-muted: #5a6278;
+        --dourbia-border: #d8eef1;
       }
       * { box-sizing: border-box; }
       body { margin: 0; }
@@ -20,45 +26,46 @@
         display: flex;
         flex-direction: column;
       }
-      h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
-      .subtitle { margin: 0 0 1rem; color: #5a6278; }
-      label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; color: #5a6278; margin-bottom: 1rem; }
+      h1 { margin: 0 0 0.25rem; font-size: 1.6rem; color: var(--dourbia-navy); }
+      .subtitle { margin: 0 0 1rem; color: var(--dourbia-muted); }
+      label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; color: var(--dourbia-muted); margin-bottom: 1rem; }
       input, textarea {
         padding: 0.6rem 0.75rem;
-        border: 1px solid #c8d0e0;
+        border: 1px solid var(--dourbia-border);
         border-radius: 8px;
         font: inherit;
       }
       .chat { flex: 1; display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem; }
       .placeholder { color: #7a849c; text-align: center; margin-top: 2rem; }
       .bubble { padding: 1rem; border-radius: 12px; max-width: 95%; }
-      .bubble.user { align-self: flex-end; background: #2d4a7a; color: #fff; }
-      .bubble.assistant { align-self: flex-start; background: #fff; border: 1px solid #dde3ef; }
+      .bubble.user { align-self: flex-end; background: rgba(92, 225, 230, 0.25); color: var(--dourbia-navy); border: 1px solid var(--dourbia-border); }
+      .bubble.assistant { align-self: flex-start; background: #fff; border: 1px solid var(--dourbia-border); }
       .meta { margin-top: 0.75rem; font-size: 0.85rem; }
-      .meta a { color: #2563eb; word-break: break-all; }
-      .meta pre { background: #f0f3fa; padding: 0.5rem; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; }
+      .meta a { color: var(--dourbia-cyan-deep); word-break: break-all; }
+      .meta pre { background: #f0fafb; padding: 0.5rem; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; }
       .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }
-      .chip { background: #e8eef8; color: #2d4a7a; padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.8rem; }
-      .timing { margin-top: 0.5rem; font-size: 0.8rem; color: #5a6278; }
-      .error { color: #b42318; background: #fef3f2; padding: 0.6rem; border-radius: 8px; margin-bottom: 0.5rem; }
+      .chip { background: rgba(92, 225, 230, 0.2); color: var(--dourbia-navy); padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.8rem; border: 1px solid var(--dourbia-border); }
+      .timing { margin-top: 0.5rem; font-size: 0.8rem; color: var(--dourbia-muted); }
+      .error { color: #c2410c; background: #fff4f0; padding: 0.6rem; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid #fed7aa; }
       .composer { display: flex; gap: 0.75rem; align-items: flex-end; }
       .composer textarea { flex: 1; resize: vertical; }
       button {
         padding: 0.75rem 1.25rem;
-        background: #2d4a7a;
-        color: #fff;
+        background: var(--dourbia-cyan);
+        color: var(--dourbia-navy);
         border: none;
         border-radius: 10px;
         cursor: pointer;
         font: inherit;
+        font-weight: 600;
       }
       button:disabled { opacity: 0.6; cursor: not-allowed; }
     </style>
   </head>
   <body>
     <div class="app">
-      <h1>Guide Historique — Carthage</h1>
-      <p class="subtitle">Interface de démo (sans Node.js) — connectée à <code>/api/chat</code></p>
+      <h1><span style="color:#3ec9d0">dour</span><span style="color:#fa7921">bia</span> — Guide culturel</h1>
+      <p class="subtitle">Cultural Tourism Platform · démo connectée à <code>/api/chat</code></p>
 
       <label>
         Session ID

@@ -4,6 +4,7 @@ export interface SourceRef {
   title: string | null;
   score: number | null;
   url?: string | null;
+  provider?: string | null;
 }
 
 export interface MemoryContext {
@@ -14,6 +15,7 @@ export interface MemoryContext {
   last_mentioned_monuments: string[];
   primary_site_id: number | null;
   primary_site_name: string | null;
+  last_substantive_user_message?: string | null;
 }
 
 export interface LatencyDebug {
@@ -47,6 +49,8 @@ export interface Message {
   latencyDebug?: LatencyDebug;
   createdAt: number;
 }
+
+export type ChatLanguage = "fr" | "en" | "ar";
 
 export interface ChatSession {
   id: string;

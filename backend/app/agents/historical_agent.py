@@ -14,6 +14,7 @@ from app.rag.answer_parser import parse_llm_answer
 from app.rag.language_detection import resolve_answer_language
 from app.rag.language_messages import (
     INSUFFICIENT_CONTEXT_ANSWERS,
+    NO_ART_WEB_RESULTS_ANSWERS,
     NO_RELEVANT_WEB_RESULTS_ANSWERS,
     localized_action,
     localized_message,
@@ -28,15 +29,32 @@ from app.rag.prompts import (
 from app.rag.text_utils import normalize_text
 from app.rag.query_complexity import is_complex_question
 from app.rag.retriever import RetrievalFilters, SemanticRetriever
+from app.rag.practical_info_intent import (
+    user_explicitly_requests_circuits,
+    user_explicitly_requests_horaires_or_tarifs,
+)
 from app.rag.suggested_action_intent import get_suggested_action_intent
 from app.rag.text_utils import normalize_text
 from app.rag.web_search_decision import (
     build_emergency_web_queries,
     build_web_search_queries,
     filter_relevant_web_results,
+    filter_sources_for_query,
+    is_art_or_culture_query,
+    is_domain_related_query,
+    is_historical_figure_query,
+    is_archaeology_lookup_follow_up,
+    is_incomplete_lookup_follow_up,
+    is_vague_web_follow_up,
     local_chunks_relevant_to_query,
     region_for_web_query,
+    requests_event_or_schedule,
+    resolve_query_for_context,
+    references_session_monument,
+    requests_archaeology_news,
     should_use_web_search,
+    uses_demonstrative_reference,
+    user_requests_lookup,
     user_requests_web_search,
 )
 from app.tools.web_search_tool import BaseWebSearchTool, WebSearchResult, create_web_search_tool
@@ -211,15 +229,35 @@ class HistoricalAgent:
         local_context_relevant = local_chunks_relevant_to_query(
             cleaned_message,
             retrieved_chunks,
+            context,
         )
         explicit_web_request = user_requests_web_search(cleaned_message)
-        use_web_search = should_use_web_search(
+        wants_web_search = should_use_web_search(
             cleaned_message,
             retrieved_chunks,
             best_score,
             context,
             settings=self._settings,
-        ) and (not local_sufficient or explicit_web_request)
+        )
+        needs_topic_web_supplement = requests_archaeology_news(
+            cleaned_message, context
+        ) or (
+            not local_context_relevant
+            and (
+                is_art_or_culture_query(cleaned_message, context)
+                or is_historical_figure_query(cleaned_message)
+                or requests_event_or_schedule(cleaned_message)
+                or (
+                    user_requests_lookup(cleaned_message)
+                    and is_domain_related_query(cleaned_message, context)
+                )
+            )
+        )
+        use_web_search = wants_web_search and (
+            explicit_web_request
+            or not local_sufficient
+            or needs_topic_web_supplement
+        )
         web_search_results: list[WebSearchResult] = []
 
         if use_web_search:
@@ -256,6 +294,7 @@ class HistoricalAgent:
                             sources,
                             context,
                             answer_language,
+                            cleaned_message,
                         ),
                         memory_updates=self._build_memory_updates(
                             retrieved_chunks,
@@ -264,6 +303,68 @@ class HistoricalAgent:
                         ),
                         latency=latency,
                     )
+
+            if (
+                not web_search_results
+                and needs_topic_web_supplement
+                and is_art_or_culture_query(cleaned_message, context)
+                and not explicit_web_request
+            ):
+                filtered_sources = filter_sources_for_query(
+                    sources,
+                    cleaned_message,
+                    context,
+                )
+                return HistoricalAgentResult(
+                    answer=localized_message(
+                        NO_ART_WEB_RESULTS_ANSWERS,
+                        answer_language,
+                    ),
+                    sources=filtered_sources,
+                    suggested_actions=self._build_suggested_actions(
+                        filtered_sources,
+                        context,
+                        answer_language,
+                        cleaned_message,
+                    ),
+                    memory_updates=self._build_memory_updates(
+                        retrieved_chunks,
+                        cleaned_message,
+                        context,
+                    ),
+                    latency=latency,
+                )
+
+            if (
+                not web_search_results
+                and needs_topic_web_supplement
+                and requests_archaeology_news(cleaned_message, context)
+                and not explicit_web_request
+            ):
+                filtered_sources = filter_sources_for_query(
+                    sources,
+                    cleaned_message,
+                    context,
+                )
+                return HistoricalAgentResult(
+                    answer=localized_message(
+                        NO_RELEVANT_WEB_RESULTS_ANSWERS,
+                        answer_language,
+                    ),
+                    sources=filtered_sources,
+                    suggested_actions=self._build_suggested_actions(
+                        filtered_sources,
+                        context,
+                        answer_language,
+                        cleaned_message,
+                    ),
+                    memory_updates=self._build_memory_updates(
+                        retrieved_chunks,
+                        cleaned_message,
+                        context,
+                    ),
+                    latency=latency,
+                )
 
         if not local_sufficient and not web_search_results and not use_web_search:
             logger.info(
@@ -281,6 +382,7 @@ class HistoricalAgent:
                     sources,
                     context,
                     answer_language,
+                    cleaned_message,
                 ),
                 memory_updates=self._build_memory_updates(
                     retrieved_chunks,
@@ -307,6 +409,7 @@ class HistoricalAgent:
                         sources,
                         context,
                         answer_language,
+                        cleaned_message,
                     ),
                     memory_updates=self._build_memory_updates(
                         retrieved_chunks,
@@ -360,6 +463,8 @@ class HistoricalAgent:
             structured=self._settings.llm_structured_output,
         )
 
+        sources = filter_sources_for_query(sources, cleaned_message, context)
+
         return HistoricalAgentResult(
             answer=answer,
             sources=sources,
@@ -367,6 +472,7 @@ class HistoricalAgent:
                 sources,
                 context,
                 answer_language,
+                cleaned_message,
             ),
             memory_updates=self._build_memory_updates(
                 retrieved_chunks,
@@ -394,7 +500,15 @@ class HistoricalAgent:
         *,
         complex_question: bool = False,
     ) -> list[dict[str, Any]]:
-        query = build_retrieval_query(user_message, memory_context)
+        retrieval_message = user_message
+        if (
+            is_vague_web_follow_up(user_message)
+            or references_session_monument(user_message, memory_context)
+            or is_incomplete_lookup_follow_up(user_message, memory_context)
+            or is_archaeology_lookup_follow_up(user_message)
+        ):
+            retrieval_message = resolve_query_for_context(user_message, memory_context)
+        query = build_retrieval_query(retrieval_message, memory_context)
         filter_kwargs = derive_retrieval_filters(memory_context, language)
         action_intent = get_suggested_action_intent(user_message)
         if action_intent in {"circuit_detail", "nearby_monuments", "roman_circuit"}:
@@ -556,22 +670,26 @@ class HistoricalAgent:
         sources: list[SourceRef],
         memory_context: dict[str, Any],
         answer_language: str,
+        user_message: str,
     ) -> list[str]:
         actions: list[str] = []
         interests = {str(item).lower() for item in (memory_context.get("interests") or [])}
 
         has_monument = any(source.source_type == "monument" for source in sources)
         has_circuit = any(source.source_type == "circuit" for source in sources)
+        wants_hours = user_explicitly_requests_horaires_or_tarifs(user_message)
+        wants_circuits = user_explicitly_requests_circuits(user_message)
 
-        if has_monument:
+        if has_monument and wants_hours:
             actions.append(localized_action("show_hours", answer_language))
-        if has_circuit:
+        if has_circuit and wants_circuits:
             actions.append(localized_action("circuit_detail", answer_language))
-        if interests & {"romain", "romaine"} or any(
-            "romain" in (source.title or "").lower() for source in sources
+        if wants_circuits and (
+            interests & {"romain", "romaine"}
+            or any("romain" in (source.title or "").lower() for source in sources)
         ):
             actions.append(localized_action("roman_circuit", answer_language))
-        if memory_context.get("available_time_minutes"):
+        if wants_circuits and memory_context.get("available_time_minutes"):
             actions.append(localized_action("time_adapted_visit", answer_language))
         if len(sources) > 1:
             actions.append(localized_action("nearby_monuments", answer_language))
@@ -596,6 +714,12 @@ class HistoricalAgent:
         memory_context: dict[str, Any],
     ) -> dict[str, Any]:
         if get_site_id_for_attribute_follow_up(user_message, memory_context) is not None:
+            return {}
+
+        if references_session_monument(user_message, memory_context) and (
+            is_art_or_culture_query(user_message)
+            or user_requests_lookup(user_message)
+        ):
             return {}
 
         primary_chunk = next(

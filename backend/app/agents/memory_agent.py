@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 from app.memory.memory_service import MemoryService
 from app.memory.preference_extractor import extract_preferences_from_message
 from app.rag.language_detection import resolve_answer_language
+from app.rag.web_search_decision import (
+    is_incomplete_lookup_follow_up,
+    is_archaeology_lookup_follow_up,
+    is_substantive_user_message,
+)
 from app.models.memory import UserSession
 
 logger = logging.getLogger(__name__)
@@ -50,6 +55,10 @@ class MemoryAgent:
             request_language=request_language,
             memory_context=session_context,
         )
+        if is_substantive_user_message(user_message) and not is_incomplete_lookup_follow_up(
+            user_message, session_context
+        ) and not is_archaeology_lookup_follow_up(user_message):
+            extracted["last_substantive_user_message"] = user_message.strip()
 
         logger.info(
             "Memory turn recorded session=%s extracted_keys=%s agent_updates=%s",

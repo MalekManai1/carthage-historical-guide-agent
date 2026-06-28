@@ -16,6 +16,7 @@ PREFERENCE_KEYS = frozenset(
         "last_mentioned_monuments",
         "primary_site_id",
         "primary_site_name",
+        "last_substantive_user_message",
     }
 )
 

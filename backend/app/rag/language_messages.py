@@ -35,6 +35,25 @@ NO_RELEVANT_WEB_RESULTS_ANSWERS = {
     ),
 }
 
+NO_ART_WEB_RESULTS_ANSWERS = {
+    "fr": (
+        "Je n'ai pas trouvé, dans la base locale ni en ligne, d'informations "
+        "précises sur des œuvres artistiques liées à ce monument. "
+        "Les sources consultées décrivent surtout l'histoire ou la visite du site, "
+        "sans identifier d'objets ou de créations artistiques particulières."
+    ),
+    "en": (
+        "I could not find precise information about artworks linked to this monument "
+        "in the local knowledge base or online. Available sources mainly describe "
+        "the site's history or visit, without identifying specific artistic objects."
+    ),
+    "ar": (
+        "لم أجد معلومات دقيقة عن أعمال فنية مرتبطة بهذا الأثر في المصادر المحلية "
+        "أو عبر الإنترنت. المصادر المتاحة تصف تاريخ الموقع أو زيارته دون تحديد "
+        "قطع أو أعمال فنية محددة."
+    ),
+}
+
 LOCAL_CONTEXT_NOT_RELEVANT_NOTES = {
     "fr": (
         "La base documentaire locale ne contient pas d'informations pertinentes "

@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { DEBUG_MEMORY } from "../config";
 import type { Message } from "../types";
+import SourceList from "./SourceList";
 
 interface MessageBubbleProps {
   message: Message;
@@ -20,31 +22,23 @@ function formatLatencyStep(value: number | null | undefined): string {
   return formatDuration(value);
 }
 
-function formatSourceMeta(source: NonNullable<Message["sources"]>[number]): string {
-  if (source.source_type === "web") {
-    return "web";
-  }
-  if (source.score != null) {
-    return `${source.source_type} · score ${source.score.toFixed(2)}`;
-  }
-  return source.source_type;
-}
-
 export default function MessageBubble({
   message,
   onSuggestedActionClick,
 }: MessageBubbleProps) {
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const isUser = message.role === "user";
   const hasSources = Boolean(message.sources && message.sources.length > 0);
   const hasMemory = Boolean(message.memory);
   const hasLatencyDebug = Boolean(message.latencyDebug);
-  const showDetailsToggle = !isUser && (hasSources || hasMemory || hasLatencyDebug);
-  const responseTimeMs = message.latencyMs ?? message.elapsedMs;
+  const showDebugToggle =
+    DEBUG_MEMORY && !isUser && (hasMemory || hasLatencyDebug);
 
   return (
     <article className={`message-row ${isUser ? "user" : "assistant"}`}>
-      <div className="message-avatar">{isUser ? "Vous" : "Guide"}</div>
+      {!isUser && (
+        <img src="/dourbia-icon.png" alt="" className="message-avatar-img" />
+      )}
       <div className="message-body">
         <div className="message-content">
           {message.content.split("\n").map((line, index) => (
@@ -67,60 +61,22 @@ export default function MessageBubble({
           </div>
         )}
 
-        {!isUser && responseTimeMs != null && (
-          <p className="message-timing">
-            Répondu en {formatDuration(responseTimeMs)}
-            {message.elapsedMs != null &&
-              message.latencyMs != null &&
-              message.elapsedMs > message.latencyMs + 200 && (
-                <span className="message-timing-detail">
-                  {" "}
-                  (total navigateur {formatDuration(message.elapsedMs)})
-                </span>
-              )}
-          </p>
-        )}
+        {!isUser && hasSources && <SourceList sources={message.sources!} />}
 
-        {showDetailsToggle && (
+        {showDebugToggle && (
           <div className="message-details">
             <button
               type="button"
               className="details-toggle"
-              onClick={() => setShowDetails((value) => !value)}
+              onClick={() => setShowDebug((value) => !value)}
+              aria-expanded={showDebug}
             >
-              {showDetails ? "Masquer sources & mémoire" : "Sources & mémoire"}
+              {showDebug ? "Masquer le contexte" : "Contexte utilisé"}
             </button>
-            {showDetails && (
+            {showDebug && (
               <div className="details-panel">
-                {hasSources && (
-                  <section>
-                    <h4>Sources</h4>
-                    <ul className="source-list">
-                      {message.sources!.map((source, index) => (
-                        <li key={`${source.source_type}-${source.title ?? index}`}>
-                          <strong>{source.title ?? "Sans titre"}</strong>
-                          <span>{formatSourceMeta(source)}</span>
-                          {source.source_type === "web" && source.url && (
-                            <a
-                              className="source-link"
-                              href={source.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {source.url}
-                            </a>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
                 {hasLatencyDebug && (
-                  <section
-                    className={
-                      hasSources || hasMemory ? "details-section-spaced" : undefined
-                    }
-                  >
+                  <section>
                     <h4>Latence (debug)</h4>
                     <dl className="memory-grid latency-grid">
                       <dt>Mémoire (lecture)</dt>
@@ -148,9 +104,7 @@ export default function MessageBubble({
                 )}
                 {hasMemory && (
                   <section
-                    className={
-                      hasSources || hasLatencyDebug ? "details-section-spaced" : undefined
-                    }
+                    className={hasLatencyDebug ? "details-section-spaced" : undefined}
                   >
                     <h4>Mémoire de session</h4>
                     <dl className="memory-grid">
@@ -160,24 +114,6 @@ export default function MessageBubble({
                         <>
                           <dt>Intérêts</dt>
                           <dd>{message.memory!.interests.join(", ")}</dd>
-                        </>
-                      )}
-                      {message.memory!.available_time_minutes != null && (
-                        <>
-                          <dt>Temps disponible</dt>
-                          <dd>{message.memory!.available_time_minutes} min</dd>
-                        </>
-                      )}
-                      {message.memory!.mobility_mode && (
-                        <>
-                          <dt>Mobilité</dt>
-                          <dd>{message.memory!.mobility_mode}</dd>
-                        </>
-                      )}
-                      {message.memory!.last_mentioned_monuments.length > 0 && (
-                        <>
-                          <dt>Monuments cités</dt>
-                          <dd>{message.memory!.last_mentioned_monuments.join(", ")}</dd>
                         </>
                       )}
                     </dl>

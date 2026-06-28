@@ -10,8 +10,15 @@ from app.rag.query_complexity import user_requests_detailed_answer
 from app.rag.web_search_decision import (
     is_art_or_culture_query,
     is_historical_figure_query,
+    is_incomplete_lookup_follow_up,
+    is_vague_web_follow_up,
+    references_session_monument,
+    requests_archaeology_news,
     requests_event_or_schedule,
     requests_news_or_recent,
+    resolve_query_for_context,
+    uses_demonstrative_reference,
+    user_requests_lookup,
     user_requests_web_search,
 )
 from app.rag.language_detection import (
@@ -19,6 +26,10 @@ from app.rag.language_detection import (
     get_language_instruction,
     normalize_supported_language,
     resolve_answer_language,
+)
+from app.rag.practical_info_intent import (
+    user_explicitly_requests_circuits,
+    user_explicitly_requests_horaires_or_tarifs,
 )
 from app.rag.suggested_action_intent import (
     build_retrieval_query_for_action,
@@ -198,6 +209,7 @@ def format_memory_context(memory_context: dict[str, Any]) -> str:
         "last_mentioned_monuments": memory_context.get("last_mentioned_monuments") or [],
         "primary_site_id": memory_context.get("primary_site_id"),
         "primary_site_name": memory_context.get("primary_site_name"),
+        "last_substantive_user_message": memory_context.get("last_substantive_user_message"),
     }
     return json.dumps(compact, ensure_ascii=False, indent=2)
 
@@ -306,7 +318,26 @@ def build_output_guidelines(
             [
             "- Réponds d'abord à partir de la base documentaire locale.",
             "- Si une information manque localement, dis-le explicitement.",
-            "- Cite les monuments ou circuits pertinents quand c'est utile.",
+            "- Cite les monuments pertinents quand c'est utile pour l'histoire ou le patrimoine.",
+            ]
+        )
+
+    if not user_explicitly_requests_horaires_or_tarifs(user_message):
+        instructions.extend(
+            [
+                "- Ne mentionne pas les horaires ni les tarifs dans ta réponse.",
+                "- Même si les sources locales contiennent des horaires ou des tarifs, "
+                "ignore-les sauf demande explicite du visiteur.",
+            ]
+        )
+
+    if not user_explicitly_requests_circuits(user_message):
+        instructions.extend(
+            [
+                "- Ne mentionne pas les circuits touristiques ni les itinéraires de visite.",
+                "- Même si les sources locales décrivent un circuit, ne le présente pas "
+                "sauf demande explicite du visiteur.",
+                "- Concentre-toi sur l'histoire, l'architecture et la signification culturelle.",
             ]
         )
 
@@ -315,6 +346,16 @@ def build_output_guidelines(
             [
                 "- Si les résultats web n'apportent rien de spécifique, appuie-toi sur les sources locales.",
                 "- Ne présente pas un résultat généraliste comme s'il répondait précisément à la question.",
+            ]
+        )
+    elif has_web_context and is_art_or_culture_query(user_message, memory_context):
+        instructions.extend(
+            [
+                "- Résume uniquement ce que les extraits web disent littéralement.",
+                "- Ne cite aucun artiste, auteur ou œuvre absent des extraits web.",
+                "- Si les extraits ne listent pas d'œuvres artistiques précises, dis-le clairement.",
+                "- Ne recommande pas Salammbo ou d'autres œuvres sauf si elles apparaissent "
+                "dans WEB_SEARCH_CONTEXT.",
             ]
         )
     elif explicit_web_request and has_web_context:
@@ -342,6 +383,22 @@ def build_output_guidelines(
         )
 
     last_monuments = memory_context.get("last_mentioned_monuments") or []
+
+    if is_vague_web_follow_up(user_message) and memory_context.get(
+        "last_substantive_user_message"
+    ):
+        prior = str(memory_context["last_substantive_user_message"])
+        instructions.append(
+            f"- Le visiteur demande une recherche web sur sa question précédente : "
+            f"« {prior} ». Réponds précisément sur ce sujet, pas sur d'autres monuments."
+        )
+
+    if references_session_monument(user_message, memory_context) and last_monuments:
+        instructions.append(
+            f"- « Le monument » ou « ce monument » désigne {last_monuments[0]} "
+            "dans cette conversation. Ne réponds pas sur d'autres monuments non liés."
+        )
+
     normalized_message = user_message.strip().lower()
     is_short_presentation_follow_up = (
         len(normalized_message) <= 24
@@ -382,13 +439,34 @@ def build_output_guidelines(
             "- Réponds en 5 à 8 lignes maximum, de manière concise et directe."
         )
 
-    if is_art_or_culture_query(user_message):
+    if is_art_or_culture_query(user_message, memory_context):
         instructions.extend(
             [
                 "- L'utilisateur demande des informations artistiques ou culturelles.",
-                "- Priorise Flaubert, l'histoire de Carthage, ou des œuvres clairement liées au sujet.",
-                "- Ignore les recettes de cuisine ou contenus sans lien avec Carthage ou Salammbo.",
-                "- Si l'artiste demandé est introuvable, dis-le clairement sans inventer.",
+                "- Ne cite Salammbo, Flaubert ou un artiste que si la source le mentionne.",
+                "- Si l'artiste ou l'œuvre demandée est introuvable, dis-le clairement sans inventer.",
+                "- Ignore les recettes de cuisine ou contenus sans lien avec le sujet.",
+                "- Ne recommande pas d'autres monuments si la question porte sur le monument "
+                "en discussion et que les sources ne mentionnent pas d'œuvres pour lui.",
+                "- Ne résume pas l'histoire générale ou les infos pratiques si la question "
+                "porte sur des œuvres artistiques.",
+                "- Ne cite une source web que si elle mentionne explicitement une œuvre, "
+                "un artéfact ou un élément artistique identifié.",
+                "- Ne mentionne jamais une galerie, une exposition ou une institution "
+                "(TGM Gallery, musée, etc.) si ce n'est pas écrit dans les sources.",
+            ]
+        )
+
+    if requests_archaeology_news(user_message, memory_context):
+        instructions.extend(
+            [
+                "- L'utilisateur demande des découvertes ou actualités archéologiques.",
+                "- Ne présente pas l'histoire générale de Carthage comme une découverte récente.",
+                "- Si les sources ne mentionnent pas de fouille ou découverte récente, dis-le "
+                "clairement sans recommander d'autres monuments à la place.",
+                "- Ne propose pas de circuits touristiques à la place d'une réponse sur les fouilles.",
+                "- Ne cite pas de sources scientifiques générales (cosmos, boson de Higgs, etc.) "
+                "si elles ne concernent pas Carthage.",
             ]
         )
 
@@ -419,7 +497,7 @@ def build_output_guidelines(
         )
 
     action_intent = get_suggested_action_intent(user_message)
-    if action_intent == "circuit_detail":
+    if action_intent == "circuit_detail" and user_explicitly_requests_circuits(user_message):
         instructions.append(
             "- L'utilisateur demande le détail d'un circuit lié au monument ou site en discussion."
             " Priorise un circuit de Carthage, pas La Marsa ou une autre destination."
@@ -456,7 +534,13 @@ def build_rag_messages(
         if explicit_web_request is not None
         else user_requests_web_search(user_message)
     )
-    if is_explicit_web_request and not local_context_relevant:
+    hide_irrelevant_local = not local_context_relevant and (
+        is_explicit_web_request
+        or user_requests_lookup(user_message)
+        or is_art_or_culture_query(user_message, memory_context)
+        or requests_archaeology_news(user_message, memory_context)
+    )
+    if hide_irrelevant_local:
         retrieved_context = localized_message(
             LOCAL_CONTEXT_NOT_RELEVANT_NOTES,
             answer_language,
@@ -469,6 +553,23 @@ def build_rag_messages(
     language_display = (
         f"{LANGUAGE_LABELS.get(answer_language, answer_language)} ({answer_language})"
     )
+    display_question = user_message.strip()
+    if is_vague_web_follow_up(user_message) or references_session_monument(
+        user_message, memory_context
+    ) or is_incomplete_lookup_follow_up(user_message, memory_context):
+        resolved = resolve_query_for_context(user_message, memory_context)
+        if resolved != user_message.strip():
+            display_question = (
+                f"{user_message.strip()}\n\n"
+                f"Question interprétée : {resolved}"
+            )
+        elif is_vague_web_follow_up(user_message):
+            prior = memory_context.get("last_substantive_user_message")
+            if prior:
+                display_question = (
+                    f"{user_message.strip()}\n\n"
+                    f"Question précédente du visiteur : {prior}"
+                )
     return format_rag_messages(
         answer_language=language_display,
         memory_context=format_memory_context(memory_context),
@@ -477,7 +578,7 @@ def build_rag_messages(
             web_search_results,
             answer_language=answer_language,
         ),
-        user_question=user_message.strip(),
+        user_question=display_question,
         output_guidelines=build_output_guidelines(
             user_message=user_message,
             memory_context=memory_context,

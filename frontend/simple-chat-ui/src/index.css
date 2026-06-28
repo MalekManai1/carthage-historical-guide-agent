@@ -1,22 +1,46 @@
 :root {
+  --dourbia-orange: #fa7921;
+  --dourbia-orange-hover: #e86d18;
+  --dourbia-cyan: #5ce1e6;
+  --dourbia-cyan-deep: #3ec9d0;
+  --dourbia-cyan-soft: #9cecef;
+  --dourbia-cyan-bg: #b8ebf2;
+  --dourbia-nav: #2f2f2f;
+  --dourbia-text: #242424;
+  --dourbia-text-muted: #5a6278;
+  --dourbia-bg: #ffffff;
+  --dourbia-surface: #f6fbfc;
+  --dourbia-border: #d8eef1;
+  --dourbia-border-strong: #b8e4ea;
+  --dourbia-shadow: 0 4px 24px rgba(92, 225, 230, 0.12);
+
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   line-height: 1.5;
-  color: #111827;
-  background: #ffffff;
+  color: var(--dourbia-text);
+  background: var(--dourbia-bg);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 html,
 body {
   margin: 0;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  overflow-x: hidden;
 }
 
 #root {
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--dourbia-orange);
+  outline-offset: 2px;
 }

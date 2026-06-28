@@ -14,8 +14,8 @@ function createMessageId(): string {
 
 function makeTitle(text: string): string {
   const cleaned = text.trim().replace(/\s+/g, " ");
-  if (cleaned.length <= 42) return cleaned;
-  return `${cleaned.slice(0, 42)}…`;
+  if (cleaned.length <= 32) return cleaned;
+  return `${cleaned.slice(0, 32)}…`;
 }
 
 function loadChats(): ChatSession[] {

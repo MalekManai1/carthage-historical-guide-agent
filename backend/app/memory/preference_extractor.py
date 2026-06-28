@@ -99,6 +99,9 @@ def merge_memory_updates(
         if key in (memory_updates or {}):
             merged[key] = memory_updates[key]
 
+    if "last_substantive_user_message" in extracted:
+        merged["last_substantive_user_message"] = extracted["last_substantive_user_message"]
+
     return merged
 
 
@@ -116,6 +119,7 @@ def build_memory_context(
         "last_mentioned_monuments": list(preferences.get("last_mentioned_monuments") or []),
         "primary_site_id": preferences.get("primary_site_id"),
         "primary_site_name": preferences.get("primary_site_name"),
+        "last_substantive_user_message": preferences.get("last_substantive_user_message"),
     }
 
 

@@ -23,8 +23,9 @@ class Settings(BaseSettings):
     app_name: str = "Historical Guide RAG Agent"
     debug: bool = False
     database_url: str = (
-        "postgresql+psycopg://postgres:postgres@localhost:5432/historical_guide"
+        "postgresql+psycopg://postgres:postgres@localhost:5433/historical_guide"
     )
+    database_connect_timeout_seconds: float = 5.0
 
     embedding_provider: str = "e5"
     embedding_model_name: str = "intfloat/multilingual-e5-small"

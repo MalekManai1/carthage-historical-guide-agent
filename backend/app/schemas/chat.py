@@ -64,6 +64,7 @@ class MemoryContextSchema(BaseModel):
     last_mentioned_monuments: list[str] = Field(default_factory=list)
     primary_site_id: int | None = None
     primary_site_name: str | None = None
+    last_substantive_user_message: str | None = None
 
 
 class LatencyDebugSchema(BaseModel):

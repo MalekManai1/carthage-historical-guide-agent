@@ -109,6 +109,29 @@ class MockWebSearchTool(BaseWebSearchTool):
         region: str | None = None,
     ) -> list[WebSearchResult]:
         self.calls.append((query, max_results))
+        normalized = query.lower()
+        if "thermes" in normalized or "antonin" in normalized:
+            return [
+                WebSearchResult(
+                    title="Mosaïques des Thermes d'Antonin à Carthage",
+                    url="https://example.com/thermes-art",
+                    snippet=(
+                        "Œuvres artistiques et mosaïques romaines des Thermes d'Antonin "
+                        "à Carthage, Tunisie."
+                    ),
+                )
+            ]
+        if "art" in normalized or "oeuvre" in normalized or "tophet" in normalized:
+            return [
+                WebSearchResult(
+                    title="Stèles du Tophet de Carthage",
+                    url="https://example.com/tophet-art",
+                    snippet=(
+                        "Stèles et sculptures artistiques du tophet punique "
+                        "à Carthage, Tunisie."
+                    ),
+                )
+            ]
         return [
             WebSearchResult(
                 title="Patrimoine de Carthage",
@@ -158,6 +181,189 @@ def test_historical_agent_does_not_call_web_search_when_local_context_sufficient
     )
 
     assert web_tool.calls == []
+
+
+class TophetOnlyRetriever:
+    def retrieve(
+        self,
+        query: str,
+        *,
+        top_k: int = 5,
+        filters: RetrievalFilters | None = None,
+    ) -> list[dict]:
+        return [
+            {
+                "source_type": "monument",
+                "source_id": 5.0,
+                "title": "Tophet",
+                "score": 0.89,
+                "chunk_text": (
+                    "Monument funéraire punique dédié à Ba'al et Tanit. "
+                    "Durée de visite 20 minutes."
+                ),
+                "metadata": {},
+            }
+        ]
+
+
+def test_historical_agent_calls_web_for_rechercher_art_despite_high_local_score() -> None:
+    web_tool = MockWebSearchTool()
+    agent = HistoricalAgent(
+        MagicMock(),
+        retriever=TophetOnlyRetriever(),
+        llm=MockLLMClient(response="Réponse web sur les œuvres."),
+        settings=Settings(llm_provider="mock", web_search_enabled=True),
+        web_search_tool=web_tool,
+    )
+
+    result = agent.answer(
+        user_message="rechercher les oeuvres artistiques liées au tophet",
+        memory_context={"last_mentioned_monuments": ["Tophet"]},
+    )
+
+    assert len(web_tool.calls) >= 1
+    assert any(source.source_type == "web" for source in result.sources)
+    assert all(
+        source.title == "Tophet" or source.source_type == "web"
+        for source in result.sources
+    )
+
+
+class WrongMonumentsRetriever:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def retrieve(
+        self,
+        query: str,
+        *,
+        top_k: int = 5,
+        filters: RetrievalFilters | None = None,
+    ) -> list[dict]:
+        self.calls.append(query)
+        return [
+            {
+                "source_type": "monument",
+                "source_id": 2.0,
+                "title": "Monument a absides",
+                "score": 0.75,
+                "chunk_text": "Monument culte romain fermé actuellement.",
+                "metadata": {},
+            }
+        ]
+
+
+def test_historical_agent_resolves_ce_monument_art_follow_up_with_web_search() -> None:
+    web_tool = MockWebSearchTool()
+    retriever = WrongMonumentsRetriever()
+    agent = HistoricalAgent(
+        MagicMock(),
+        retriever=retriever,
+        llm=MockLLMClient(response="Réponse sur les œuvres des Thermes."),
+        settings=Settings(llm_provider="mock", web_search_enabled=True),
+        web_search_tool=web_tool,
+    )
+    memory = {
+        "last_mentioned_monuments": ["Thermes d'Antonin"],
+        "last_substantive_user_message": "Explique-moi les Thermes d'Antonin",
+        "preferred_language": "fr",
+    }
+
+    result = agent.answer(
+        user_message="rechercher des oeuvres artistiques liées à ce monument",
+        memory_context=memory,
+        language="fr",
+    )
+
+    assert len(retriever.calls) == 1
+    assert "thermes" in retriever.calls[0].lower()
+    assert "antonin" in retriever.calls[0].lower()
+    assert len(web_tool.calls) >= 1
+    assert any("thermes" in call[0].lower() for call in web_tool.calls)
+    assert any(source.source_type == "web" for source in result.sources)
+    monument_titles = [
+        source.title for source in result.sources if source.source_type == "monument"
+    ]
+    assert "Monument a absides" not in monument_titles
+
+
+def test_historical_agent_resolves_au_monument_without_polluting_memory() -> None:
+    web_tool = MockWebSearchTool()
+    retriever = WrongMonumentsRetriever()
+    agent = HistoricalAgent(
+        MagicMock(),
+        retriever=retriever,
+        llm=MockLLMClient(response="Réponse sur les œuvres des Thermes."),
+        settings=Settings(llm_provider="mock", web_search_enabled=True),
+        web_search_tool=web_tool,
+    )
+    memory = {
+        "last_mentioned_monuments": ["Thermes d'Antonin"],
+        "last_substantive_user_message": "Explique-moi les Thermes d'Antonin",
+        "preferred_language": "fr",
+    }
+
+    result = agent.answer(
+        user_message="rechercher les oeuvres artistiques liées au monument",
+        memory_context=memory,
+        language="fr",
+    )
+
+    assert "thermes" in retriever.calls[0].lower()
+    assert result.memory_updates.get("last_mentioned_monuments") in (None, [])
+    assert any(source.source_type == "web" for source in result.sources)
+
+
+def test_historical_agent_returns_no_art_message_when_web_only_tourism() -> None:
+    class TourismWebTool(BaseWebSearchTool):
+        def search(
+            self,
+            query: str,
+            max_results: int = 3,
+            *,
+            region: str | None = None,
+        ) -> list[WebSearchResult]:
+            return [
+                WebSearchResult(
+                    title="Thermes d'Antonin - Wikipédia",
+                    url="https://fr.wikipedia.org/wiki/Thermes_d%27Antonin",
+                    snippet=(
+                        "Ensemble thermal romain important à Carthage, sans détail "
+                        "sur des objets artistiques."
+                    ),
+                ),
+                WebSearchResult(
+                    title="Thermes d'Antonin - Guide Voyage Tunisie",
+                    url="https://guide-voyage-tunisie.com/les-thermes-dantonin-de-carthage",
+                    snippet="Monument touristique majeur à Carthage.",
+                ),
+            ]
+
+    agent = HistoricalAgent(
+        MagicMock(),
+        retriever=TrackingRetriever(),
+        llm=MockLLMClient(response="Ne doit pas être utilisé."),
+        settings=Settings(llm_provider="mock", web_search_enabled=True),
+        web_search_tool=TourismWebTool(),
+    )
+    memory = {
+        "last_mentioned_monuments": ["Thermes d'Antonin"],
+        "last_substantive_user_message": "Explique-moi les Thermes d'Antonin",
+    }
+
+    result = agent.answer(
+        user_message="rechercher les oeuvres artistiques liées au monument",
+        memory_context=memory,
+    )
+
+    assert "base locale ni en ligne" in result.answer.lower()
+    assert "Ne doit pas" not in result.answer
+    assert not any(
+        source.source_type == "web"
+        and source.url
+        and "guide-voyage-tunisie" in source.url
+        for source in result.sources
+    )
 
 
 def test_historical_agent_calls_web_search_when_local_context_insufficient_and_enabled() -> None:

@@ -61,3 +61,24 @@ def test_build_rag_messages_delegates_memory_and_context() -> None:
     assert "Horaires été: 08H00 - 18H00" in user_content
     assert "Et quels sont les horaires ?" in user_content
     assert "Thermes d'Antonin" in user_content
+
+
+def test_build_rag_messages_omits_practical_info_rules_for_history_question() -> None:
+    messages = build_rag_messages(
+        user_message="Explique-moi les Thermes d'Antonin",
+        memory_context={"preferred_language": "fr"},
+        retrieved_chunks=[
+            {
+                "title": "Thermes d'Antonin",
+                "source_type": "monument",
+                "score": 0.91,
+                "chunk_text": "Complexe thermal romain.",
+                "metadata": {},
+            }
+        ],
+        language="fr",
+    )
+
+    guidelines = messages[1]["content"].split("Règles de réponse:", 1)[1]
+    assert "Ne mentionne pas les horaires ni les tarifs" in guidelines
+    assert "Ne mentionne pas les circuits touristiques" in guidelines
