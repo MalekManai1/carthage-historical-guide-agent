@@ -9,6 +9,7 @@ from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.circuit_monument import CircuitMonument
+    from app.models.monument_distance import MonumentDistance
 
 
 class Monument(Base, TimestampMixin):
@@ -26,6 +27,8 @@ class Monument(Base, TimestampMixin):
     name_en: Mapped[str | None] = mapped_column(String(255), nullable=True)  # nom_monument_EN
     name_ar: Mapped[str | None] = mapped_column(String(255), nullable=True)  # nom_monument_AR
     priority: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)  # priorité
+    popularity: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), nullable=True)
+    circuit_index: Mapped[int | None] = mapped_column(nullable=True)  # 0-based row in monuments.csv
     latitude: Mapped[Decimal | None] = mapped_column(Numeric(12, 8), nullable=True)
     longitude: Mapped[Decimal | None] = mapped_column(Numeric(12, 8), nullable=True)
     status: Mapped[str | None] = mapped_column(String(100), nullable=True)  # statut_monument
@@ -67,4 +70,12 @@ class Monument(Base, TimestampMixin):
 
     circuit_links: Mapped[list["CircuitMonument"]] = relationship(
         back_populates="monument",
+    )
+    outgoing_distances: Mapped[list["MonumentDistance"]] = relationship(
+        foreign_keys="MonumentDistance.from_monument_id",
+        back_populates="from_monument",
+    )
+    incoming_distances: Mapped[list["MonumentDistance"]] = relationship(
+        foreign_keys="MonumentDistance.to_monument_id",
+        back_populates="to_monument",
     )

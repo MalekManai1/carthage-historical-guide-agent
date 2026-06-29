@@ -1,4 +1,4 @@
-export type SiteView = "home" | "tours" | "about" | "contact" | "help";
+export type SiteView = "home" | "tours" | "circuit" | "about" | "contact" | "help";
 
 export const SITE_CONTACT = {
   website: "https://www.dourbia.tn",

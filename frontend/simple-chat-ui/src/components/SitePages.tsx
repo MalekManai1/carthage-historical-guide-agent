@@ -9,6 +9,7 @@ import {
   TEAM,
   type SiteView,
 } from "../content/siteContent";
+import CircuitPlannerPage from "./circuits/CircuitPlannerPage";
 
 interface SitePagesProps {
   view: SiteView;
@@ -247,6 +248,8 @@ export default function SitePages(props: SitePagesProps) {
   switch (props.view) {
     case "tours":
       return <ToursView {...props} />;
+    case "circuit":
+      return <CircuitPlannerPage />;
     case "about":
       return <AboutView />;
     case "contact":

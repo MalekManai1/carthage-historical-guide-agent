@@ -9,8 +9,9 @@ MVP autonome pour un agent guide historique RAG centré sur Carthage, Tunisie.
 - **Hybrid retrieval** — pgvector + keyword + intent scoring (~83% Top-1)
 - **Optional web fallback** — DuckDuckGo search when local RAG is insufficient (disabled by default)
 - **`POST /api/chat`** — Main integration endpoint
+- **`POST /api/circuits/recommend`** — Algorithmic circuit recommendation (CircuitAgent)
 - **Evaluation suite** — Retrieval (30 Q) + chat (40 cases)
-- **Optional UI** — React/Vite chat in `frontend/simple-chat-ui/`
+- **Optional UI** — React/Vite chat + circuit planner in `frontend/simple-chat-ui/`
 
 ## Quick start
 
@@ -36,6 +37,7 @@ alembic upgrade head
 
 ```bash
 python scripts/ingest_excel.py
+python scripts/import_circuit_datasets.py   # CircuitAgent graph + monuments CSV
 python scripts/chunk_documents.py
 python scripts/generate_embeddings.py
 ```
@@ -56,6 +58,18 @@ curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
   -d "{\"session_id\":\"test_01\",\"message\":\"Explique-moi les Thermes d'\''Antonin.\",\"language\":\"fr\"}"
 ```
+
+### 6. Test circuit recommendation
+
+```bash
+curl -X POST http://localhost:8000/api/circuits/recommend \
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"session_001\",\"type_tarif\":\"etudiant\",\"budget_max\":30,\"transport\":\"walking\",\"mobilite\":\"normale\",\"duration_minutes\":120,\"zone\":\"Carthage\",\"preferences\":{\"epoques\":[\"Romaine\"],\"fonctions\":[\"musee\"],\"must_visit\":[\"Thermes d'Antonin\"],\"avoid\":[]}}"
+```
+
+Or open the React UI → **Circuit** tab → **Créer mon circuit**.
+
+See [docs/circuit_agent.md](docs/circuit_agent.md) and [docs/api_reference.md](docs/api_reference.md).
 
 ## Evaluation
 
@@ -99,13 +113,15 @@ cd frontend\simple-chat-ui
 
 Or install Node.js LTS from https://nodejs.org/ then `npm install && npm run dev`.
 
-Open http://localhost:5173 (API on port 8000). See `frontend/simple-chat-ui/README.md`.
+Open http://localhost:5173 (API on port 8000). Use the **Circuit** nav item for the personalized circuit planner with map. See `frontend/simple-chat-ui/README.md`.
 
 ## Documentation
 
 | Doc | Description |
 |-----|-------------|
 | [architecture.md](docs/architecture.md) | System design and components |
+| [circuit_agent.md](docs/circuit_agent.md) | CircuitAgent (GA + Dijkstra) |
+| [api_reference.md](docs/api_reference.md) | HTTP API reference |
 | [rag_pipeline.md](docs/rag_pipeline.md) | Ingestion → embeddings → retrieval |
 | [retrieval_evaluation.md](docs/retrieval_evaluation.md) | 30 retrieval test questions |
 | [evaluation.md](docs/evaluation.md) | Full evaluation report |

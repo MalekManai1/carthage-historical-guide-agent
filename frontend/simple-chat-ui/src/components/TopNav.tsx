@@ -10,6 +10,7 @@ interface TopNavProps {
 const NAV_ITEMS: { id: SiteView; label: string }[] = [
   { id: "home", label: "Home" },
   { id: "tours", label: "Tours" },
+  { id: "circuit", label: "Circuit" },
   { id: "about", label: "About" },
   { id: "contact", label: "Contact" },
   { id: "help", label: "Help" },

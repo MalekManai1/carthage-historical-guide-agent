@@ -11,17 +11,20 @@ flowchart TD
     Orch[LocalOrchestrator]
     Mem[MemoryAgent]
     Hist[HistoricalAgent]
+    Circuit[CircuitAgent]
     Ret[SemanticRetriever]
     LLM[Groq Llama 3.1]
     DB[(PostgreSQL + pgvector)]
 
     User --> API
     API --> Orch
+    API --> Circuit
     Orch --> Mem
     Orch --> Hist
     Hist --> Ret
     Hist --> LLM
     Hist --> Web[DuckDuckGoSearchTool]
+    Circuit --> DB
     Ret --> DB
     Mem --> DB
 ```
@@ -32,6 +35,8 @@ flowchart TD
 |-----------|------|----------------|
 | FastAPI app | `backend/app/main.py` | HTTP API, CORS, request logging |
 | Chat route | `backend/app/api/routes_chat.py` | `POST /api/chat` |
+| Circuit route | `backend/app/api/routes_circuit_agent.py` | `POST /api/circuits/recommend` |
+| CircuitAgent | `backend/app/agents/circuit_agent.py` | GA + Dijkstra circuit optimization (no LLM) |
 | LocalOrchestrator | `backend/app/agents/local_orchestrator.py` | Load memory → answer → update memory |
 | HistoricalAgent | `backend/app/agents/historical_agent.py` | Retrieve chunks, optional web fallback, call LLM, return sources |
 | DuckDuckGoSearchTool | `backend/app/tools/web_search_tool.py` | Optional web search fallback (no API key) |
@@ -69,6 +74,18 @@ The local orchestrator must not grow into a complex workflow engine. See `docs/i
 | `user_sessions` | Chat sessions |
 | `chat_messages` | User/assistant message history |
 | `user_preferences` | Session-level JSON preferences |
+| `monument_distances` | Directed graph edges for circuit routing |
+| `reference_circuits` | Pre-computed circuits from CSV (GA warm-start) |
+
+## Circuit recommendation flow
+
+1. Client sends `POST /api/circuits/recommend` with profile and preferences.
+2. `CircuitAgent` loads monuments and distance graph from PostgreSQL.
+3. Hard constraints filter the candidate pool (budget, mobility, must/avoid).
+4. Genetic algorithm selects and orders monuments; Dijkstra computes leg travel times.
+5. API returns circuit summary, route polyline, constraints, and explanations.
+
+See [circuit_agent.md](circuit_agent.md) for details.
 
 ## Configuration
 
@@ -84,5 +101,6 @@ Key environment variables (see `.env.example`):
 
 - `destination_name` in chunk metadata is hardcoded to Carthage for most rows.
 - DuckDuckGo web search is a fallback only; results are unverified and may be incomplete or rate-limited.
-- No reservation, weather, or advanced circuit optimization.
-- Monuments/circuits read API routes are not exposed; data is accessed via RAG and chat.
+- Circuit routing uses graph travel times; map polylines are indicative until OSRM integration.
+- No reservation, weather, or payment flows.
+- Monuments/circuits read API routes are not exposed for RAG data; circuit endpoint is separate from chat.

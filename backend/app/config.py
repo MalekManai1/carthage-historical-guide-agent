@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     tavily_search_depth: str = "basic"
 
+    circuit_ga_population_size: int = 40
+    circuit_ga_generations: int = 50
+    circuit_ga_mutation_rate: float = 0.15
+    circuit_ga_crossover_rate: float = 0.8
+    circuit_ga_elitism: bool = True
+
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
